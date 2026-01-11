@@ -3,25 +3,25 @@
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth-context';
-import { BookOpen, Calendar, Award, MessageSquare } from 'lucide-react';
+import { GraduationCap, Calendar, Award, MessageSquare } from 'lucide-react';
 
-export default function TeacherDashboard() {
+export default function ParentDashboard() {
   const { user } = useAuth();
 
   const stats = [
-    { title: 'My Classes', value: '5', icon: BookOpen, color: 'bg-green-100 text-green-600' },
-    { title: 'Classes Today', value: '3', icon: Calendar, color: 'bg-blue-100 text-blue-600' },
-    { title: 'Students', value: '156', icon: Award, color: 'bg-purple-100 text-purple-600' },
-    { title: 'Messages', value: '12', icon: MessageSquare, color: 'bg-orange-100 text-orange-600' },
+    { title: 'Children', value: '2', icon: GraduationCap, color: 'bg-purple-100 text-purple-600' },
+    { title: 'Upcoming Events', value: '3', icon: Calendar, color: 'bg-blue-100 text-blue-600' },
+    { title: 'Avg Grade', value: 'A-', icon: Award, color: 'bg-green-100 text-green-600' },
+    { title: 'Messages', value: '5', icon: MessageSquare, color: 'bg-orange-100 text-orange-600' },
   ];
 
   return (
-    <DashboardLayout role="teacher" title="Teacher Dashboard">
+    <DashboardLayout role="parent" title="Parent Dashboard">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Welcome Message */}
-        <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-6 text-white">
-          <h2 className="text-2xl font-bold">Welcome, Teacher!</h2>
-          <p className="text-green-100 mt-1">Your classes and students are waiting.</p>
+        <div className="bg-gradient-to-r from-purple-500 to-violet-500 rounded-xl p-6 text-white">
+          <h2 className="text-2xl font-bold">Welcome, Parent!</h2>
+          <p className="text-purple-100 mt-1">Track your child&apos;s progress and stay connected.</p>
         </div>
 
         {/* Stats Grid */}
@@ -49,11 +49,11 @@ export default function TeacherDashboard() {
         {/* Info Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Teacher Portal</CardTitle>
-            <CardDescription>Access your teaching resources</CardDescription>
+            <CardTitle>Parent Portal</CardTitle>
+            <CardDescription>Monitor your child&apos;s education</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">Welcome to the EduSmart Teacher Portal. Use the sidebar to navigate to your profile and settings.</p>
+            <p className="text-gray-600">Welcome to the EduSmart Parent Portal. Use the sidebar to navigate to your profile and settings.</p>
           </CardContent>
         </Card>
       </div>

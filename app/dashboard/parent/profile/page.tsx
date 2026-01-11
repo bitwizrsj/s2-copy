@@ -3,10 +3,10 @@
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { ProfilePage } from '@/components/common/profile-page';
 
-export default function TeacherProfile() {
+export default function ParentProfile() {
   return (
-    <DashboardLayout role="teacher" title="Profile">
-      <ProfilePage role="teacher" />
+    <DashboardLayout role="parent" title="Profile">
+      <ProfilePage role="parent" />
     </DashboardLayout>
   );
 }
