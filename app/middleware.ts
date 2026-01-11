@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import jwt from 'jsonwebtoken';
+
+// Role hierarchy for route access
+const roleRouteMap: Record<string, string[]> = {
+  superadmin: ['/dashboard/superadmin'],
+  admin: ['/dashboard/admin'],
+  teacher: ['/dashboard/teacher'],
+  parent: ['/dashboard/parent'],
+  student: ['/dashboard/student'],
+};
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
+  const userCookie = request.cookies.get('user')?.value;
   const { pathname } = request.nextUrl;
 
-  // Public paths (root page has login form, so it's public)
-  const isPublicPath = pathname === '/' || pathname.startsWith('/change-password');
+  // Public paths
+  const isPublicPath = pathname === '/';
   
   // API routes are always accessible
   if (pathname.startsWith('/api/')) {
@@ -16,35 +25,61 @@ export function middleware(request: NextRequest) {
 
   // Check if route is protected (dashboard routes)
   const isProtectedRoute = pathname.startsWith('/dashboard');
+  const isChangePasswordRoute = pathname.startsWith('/change-password');
 
-  // Validate token for protected routes
+  // For protected routes, check authentication
   if (isProtectedRoute) {
-    if (!token) {
-      // No token, redirect to login (root page)
+    if (!token || !userCookie) {
+      // No token, redirect to login
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Verify token is valid
     try {
-      const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
-      jwt.verify(token, jwtSecret);
+      // Parse user data to check role
+      const userData = JSON.parse(decodeURIComponent(userCookie));
+      const userRole = userData.role;
+
+      // Check if user is accessing correct role dashboard
+      const allowedPaths = roleRouteMap[userRole] || [];
+      const isAccessingOwnDashboard = allowedPaths.some(path => pathname.startsWith(path));
+
+      if (!isAccessingOwnDashboard) {
+        // Redirect to their own dashboard
+        return NextResponse.redirect(new URL(`/dashboard/${userRole}`, request.url));
+      }
+
+      // Check if password needs to be changed
+      if (!userData.isPasswordChanged && !isChangePasswordRoute) {
+        return NextResponse.redirect(new URL('/change-password', request.url));
+      }
     } catch (error) {
-      // Invalid or expired token, redirect to login (root page)
+      // Invalid cookie data, redirect to login
       const response = NextResponse.redirect(new URL('/', request.url));
-      // Clear invalid token cookie
       response.cookies.delete('token');
       response.cookies.delete('user');
       return response;
     }
   }
 
-  // Redirect authenticated users away from login page (root page)
-  if (pathname === '/' && token) {
+  // Change password route - needs to be authenticated
+  if (isChangePasswordRoute) {
+    if (!token || !userCookie) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
+
+  // Redirect authenticated users away from login page
+  if (pathname === '/' && token && userCookie) {
     try {
-      const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
-      jwt.verify(token, jwtSecret);
-      // Token is valid, redirect to dashboard
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      const userData = JSON.parse(decodeURIComponent(userCookie));
+      
+      // If password not changed, go to change password
+      if (!userData.isPasswordChanged) {
+        return NextResponse.redirect(new URL('/change-password', request.url));
+      }
+      
+      // Otherwise go to their dashboard
+      return NextResponse.redirect(new URL(`/dashboard/${userData.role}`, request.url));
     } catch {
       // Token is invalid, allow access to login page
       const response = NextResponse.next();
@@ -59,13 +94,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * 1. /api/ routes
-     * 2. /_next/ (Next.js internals)
-     * 3. /favicon.ico (favicon file)
-     * 4. /public (public files)
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
   ],
 };
