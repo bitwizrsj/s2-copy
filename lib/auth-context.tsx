@@ -15,12 +15,15 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string, role: string) => Promise<void>;
+  login: (email: string, password: string, role: string) => Promise<any>;
   logout: () => void;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<any>;
   isAuthenticated: boolean;
+}
+
+interface AuthProviderProps {
+  children: ReactNode;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,26 +36,47 @@ export const useAuth = () => {
   return context;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
+// Helper functions for cookies
+const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+};
+
+const setCookie = (name: string, value: string, days = 7) => {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Strict${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`;
+};
+
+const deleteCookie = (name: string) => {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
+};
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    // Check for existing auth data on mount
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+  // Parse user from cookie
+  const getUserFromCookie = (): User | null => {
+    const userCookie = getCookie('user');
+    if (!userCookie) return null;
+    
+    try {
+      return JSON.parse(decodeURIComponent(userCookie));
+    } catch {
+      return null;
     }
+  };
 
+  useEffect(() => {
+    // Check if user is authenticated
+    const userData = getUserFromCookie();
+    if (userData) {
+      setUser(userData);
+    }
     setIsLoading(false);
   }, []);
 
@@ -72,15 +96,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Store auth data
-      localStorage.setItem('token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
+      const { token, user: userData } = data.data;
+
+      // Set auth cookies
+      setCookie('token', token);
+      setCookie('user', encodeURIComponent(JSON.stringify(userData)));
       
-      setToken(data.data.token);
-      setUser(data.data.user);
+      // Update state
+      setUser(userData);
 
       // Check if password needs to be changed
-      if (data.data.requiresPasswordChange || !data.data.user.isPasswordChanged) {
+      if (data.data.requiresPasswordChange || !userData.isPasswordChanged) {
         router.push('/change-password');
         return;
       }
@@ -93,15 +119,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
+    // Clear cookies
+    deleteCookie('token');
+    deleteCookie('user');
+    
+    // Update state
     setUser(null);
-    router.push('/login');
+    
+    // Redirect to login (root page)
+    router.push('/');
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
     try {
+      const token = getCookie('token');
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/change-password`, {
         method: 'POST',
         headers: {
@@ -119,14 +151,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Update token if provided
       if (data.data.token) {
-        localStorage.setItem('token', data.data.token);
-        setToken(data.data.token);
+        setCookie('token', data.data.token);
       }
 
       // Update user's password changed status
       if (user) {
         const updatedUser = { ...user, isPasswordChanged: true };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setCookie('user', encodeURIComponent(JSON.stringify(updatedUser)));
         setUser(updatedUser);
       }
 
@@ -138,12 +169,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const value = {
     user,
-    token,
     isLoading,
     login,
     logout,
     changePassword,
-    isAuthenticated: !!token,
+    isAuthenticated: !!user,
   };
 
   return (
