@@ -1,355 +1,383 @@
 'use client';
 
-import { useState } from 'react';
-import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
+import { useState, useEffect } from 'react';
+import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import { 
   Users, 
   Search,
   Plus,
   Edit,
   Trash2,
-  UserCheck,
   GraduationCap,
+  UserCheck,
   User,
-  Shield,
-  Filter
+  Eye,
+  EyeOff,
+  RefreshCw
 } from 'lucide-react';
 
-export default function AdminUsers() {
+interface UserData {
+  id: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  status: string;
+  isPasswordChanged: boolean;
+  lastLogin: string | null;
+  createdAt: string;
+}
+
+const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+};
+
+export default function AdminUsersPage() {
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const users = {
-    students: [
-      { id: 1, name: 'Emma Wilson', email: 'emma.wilson@school.edu', grade: 'Grade 10', status: 'active', lastLogin: '2 hours ago' },
-      { id: 2, name: 'Alex Chen', email: 'alex.chen@school.edu', grade: 'Grade 11', status: 'active', lastLogin: '1 day ago' },
-      { id: 3, name: 'Sarah Johnson', email: 'sarah.johnson@school.edu', grade: 'Grade 9', status: 'inactive', lastLogin: '1 week ago' },
-      { id: 4, name: 'Michael Brown', email: 'michael.brown@school.edu', grade: 'Grade 12', status: 'active', lastLogin: '3 hours ago' }
-    ],
-    teachers: [
-      { id: 1, name: 'Dr. Smith', email: 'dr.smith@school.edu', subject: 'Mathematics', status: 'active', lastLogin: '1 hour ago' },
-      { id: 2, name: 'Dr. Johnson', email: 'dr.johnson@school.edu', subject: 'Physics', status: 'active', lastLogin: '30 minutes ago' },
-      { id: 3, name: 'Ms. Davis', email: 'ms.davis@school.edu', subject: 'English Literature', status: 'active', lastLogin: '2 hours ago' },
-      { id: 4, name: 'Dr. Wilson', email: 'dr.wilson@school.edu', subject: 'Chemistry', status: 'active', lastLogin: '4 hours ago' }
-    ],
-    parents: [
-      { id: 1, name: 'Michael Thompson', email: 'michael.thompson@email.com', child: 'Emma Thompson', status: 'active', lastLogin: '1 day ago' },
-      { id: 2, name: 'Lisa Chen', email: 'lisa.chen@email.com', child: 'Alex Chen', status: 'active', lastLogin: '2 days ago' },
-      { id: 3, name: 'Robert Johnson', email: 'robert.johnson@email.com', child: 'Sarah Johnson', status: 'inactive', lastLogin: '2 weeks ago' }
-    ],
-    admins: [
-      { id: 1, name: 'Administrator', email: 'admin@school.edu', role: 'Super Admin', status: 'active', lastLogin: '30 minutes ago' },
-      { id: 2, name: 'John Doe', email: 'john.doe@school.edu', role: 'Admin', status: 'active', lastLogin: '2 hours ago' }
-    ]
+  // Create user form state
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserFirstName, setNewUserFirstName] = useState('');
+  const [newUserLastName, setNewUserLastName] = useState('');
+  const [newUserRole, setNewUserRole] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUsers(data.data);
+      }
+    } catch (error) {
+      toast.error('Failed to fetch users');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const stats = {
-    students: { total: 1247, active: 1198, inactive: 49 },
-    teachers: { total: 87, active: 85, inactive: 2 },
-    parents: { total: 892, active: 856, inactive: 36 },
-    admins: { total: 5, active: 5, inactive: 0 }
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserRole || !newUserPassword) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const token = getCookie('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: newUserEmail,
+          firstName: newUserFirstName,
+          lastName: newUserLastName,
+          role: newUserRole,
+          password: newUserPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('User created successfully!');
+        setIsCreateDialogOpen(false);
+        resetCreateForm();
+        fetchUsers();
+      } else {
+        toast.error(data.message || 'Failed to create user');
+      }
+    } catch (error) {
+      toast.error('Failed to create user');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm('Are you sure you want to deactivate this user?')) return;
+
+    try {
+      const token = getCookie('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('User deactivated successfully');
+        fetchUsers();
+      } else {
+        toast.error(data.message || 'Failed to deactivate user');
+      }
+    } catch (error) {
+      toast.error('Failed to deactivate user');
+    }
+  };
+
+  const resetCreateForm = () => {
+    setNewUserEmail('');
+    setNewUserFirstName('');
+    setNewUserLastName('');
+    setNewUserRole('');
+    setNewUserPassword('');
+  };
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = 
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.firstName && user.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.lastName && user.lastName.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+    
+    return matchesSearch && matchesRole;
+  });
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'teacher': return <UserCheck className="h-5 w-5" />;
+      case 'student': return <GraduationCap className="h-5 w-5" />;
+      default: return <User className="h-5 w-5" />;
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'teacher': return 'bg-green-100 text-green-800';
+      case 'parent': return 'bg-purple-100 text-purple-800';
+      case 'student': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar role="admin" />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="User Management" role="admin" userName="Administrator" />
-        
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* User Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-blue-700">Students</p>
-                      <p className="text-2xl font-bold text-blue-900">{stats.students.total}</p>
-                      <p className="text-xs text-blue-600">{stats.students.active} active</p>
-                    </div>
-                    <GraduationCap className="h-8 w-8 text-blue-600" />
+    <DashboardLayout role="admin" title="User Management">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Manage Users</h2>
+            <p className="text-gray-500">Create and manage teachers, parents, and students</p>
+          </div>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="create-user-btn">
+                <Plus className="h-4 w-4 mr-2" />
+                Create User
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New User</DialogTitle>
+                <DialogDescription>
+                  Create a new user account. Admin can create teachers, parents, and students.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="user@example.com"
+                    data-testid="new-user-email"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={newUserFirstName}
+                      onChange={(e) => setNewUserFirstName(e.target.value)}
+                      placeholder="John"
+                      data-testid="new-user-firstname"
+                    />
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-700">Teachers</p>
-                      <p className="text-2xl font-bold text-green-900">{stats.teachers.total}</p>
-                      <p className="text-xs text-green-600">{stats.teachers.active} active</p>
-                    </div>
-                    <UserCheck className="h-8 w-8 text-green-600" />
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={newUserLastName}
+                      onChange={(e) => setNewUserLastName(e.target.value)}
+                      placeholder="Doe"
+                      data-testid="new-user-lastname"
+                    />
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-purple-50 border-purple-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-purple-700">Parents</p>
-                      <p className="text-2xl font-bold text-purple-900">{stats.parents.total}</p>
-                      <p className="text-xs text-purple-600">{stats.parents.active} active</p>
-                    </div>
-                    <Users className="h-8 w-8 text-purple-600" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-orange-50 border-orange-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-orange-700">Admins</p>
-                      <p className="text-2xl font-bold text-orange-900">{stats.admins.total}</p>
-                      <p className="text-xs text-orange-600">{stats.admins.active} active</p>
-                    </div>
-                    <Shield className="h-8 w-8 text-orange-600" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Tabs defaultValue="students" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <TabsList>
-                  <TabsTrigger value="students">Students</TabsTrigger>
-                  <TabsTrigger value="teachers">Teachers</TabsTrigger>
-                  <TabsTrigger value="parents">Parents</TabsTrigger>
-                  <TabsTrigger value="admins">Admins</TabsTrigger>
-                </TabsList>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              </div>
-
-              {/* Search and Filter */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Search users..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <Select value={selectedRole} onValueChange={setSelectedRole}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="outline">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filter
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select value={newUserRole} onValueChange={setNewUserRole}>
+                    <SelectTrigger data-testid="new-user-role">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="teacher">Teacher</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                      <SelectItem value="student">Student</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">Note: Admins can only create teachers, parents, and students.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="Enter password"
+                      data-testid="new-user-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                  <p className="text-xs text-gray-500">User will be required to change this password on first login.</p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateUser} disabled={isCreating} data-testid="submit-create-user">
+                  {isCreating ? 'Creating...' : 'Create User'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-              <TabsContent value="students" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Student Management</CardTitle>
-                    <CardDescription>Manage student accounts and information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {users.students.map((student) => (
-                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center space-x-4">
-                            <Avatar>
-                              <AvatarFallback>
-                                <GraduationCap className="h-5 w-5" />
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{student.name}</div>
-                              <div className="text-sm text-gray-500">{student.email}</div>
-                              <div className="text-sm text-gray-500">{student.grade}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-right">
-                              <Badge variant={student.status === 'active' ? 'default' : 'secondary'}>
-                                {student.status}
-                              </Badge>
-                              <div className="text-xs text-gray-500 mt-1">{student.lastLogin}</div>
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="outline">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+        {/* Search and Filter */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="search-users"
+                />
+              </div>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="w-40" data-testid="filter-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="teacher">Teachers</SelectItem>
+                  <SelectItem value="parent">Parents</SelectItem>
+                  <SelectItem value="student">Students</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={fetchUsers}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-              <TabsContent value="teachers" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Teacher Management</CardTitle>
-                    <CardDescription>Manage teacher accounts and assignments</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {users.teachers.map((teacher) => (
-                        <div key={teacher.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center space-x-4">
-                            <Avatar>
-                              <AvatarFallback>
-                                <UserCheck className="h-5 w-5" />
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{teacher.name}</div>
-                              <div className="text-sm text-gray-500">{teacher.email}</div>
-                              <div className="text-sm text-gray-500">{teacher.subject}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-right">
-                              <Badge variant={teacher.status === 'active' ? 'default' : 'secondary'}>
-                                {teacher.status}
-                              </Badge>
-                              <div className="text-xs text-gray-500 mt-1">{teacher.lastLogin}</div>
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="outline">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
+        {/* Users List */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Users ({filteredUsers.length})
+            </CardTitle>
+            <CardDescription>Manage user accounts in your institution</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No users found. Create your first user to get started.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors" data-testid={`user-row-${user.id}`}>
+                    <div className="flex items-center gap-4">
+                      <Avatar>
+                        <AvatarFallback>{getRoleIcon(user.role)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">
+                          {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email.split('@')[0]}
                         </div>
-                      ))}
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="parents" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Parent Management</CardTitle>
-                    <CardDescription>Manage parent accounts and access</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {users.parents.map((parent) => (
-                        <div key={parent.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center space-x-4">
-                            <Avatar>
-                              <AvatarFallback>
-                                <User className="h-5 w-5" />
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{parent.name}</div>
-                              <div className="text-sm text-gray-500">{parent.email}</div>
-                              <div className="text-sm text-gray-500">Parent of {parent.child}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-right">
-                              <Badge variant={parent.status === 'active' ? 'default' : 'secondary'}>
-                                {parent.status}
-                              </Badge>
-                              <div className="text-xs text-gray-500 mt-1">{parent.lastLogin}</div>
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="outline">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right hidden sm:block">
+                        <Badge className={getRoleColor(user.role)}>
+                          {user.role}
+                        </Badge>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {user.status === 'active' ? 'Active' : 'Inactive'}
                         </div>
-                      ))}
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => handleDeleteUser(user.id)} data-testid={`delete-user-${user.id}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="admins" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Administrator Management</CardTitle>
-                    <CardDescription>Manage admin accounts and permissions</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {users.admins.map((admin) => (
-                        <div key={admin.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center space-x-4">
-                            <Avatar>
-                              <AvatarFallback>
-                                <Shield className="h-5 w-5" />
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{admin.name}</div>
-                              <div className="text-sm text-gray-500">{admin.email}</div>
-                              <div className="text-sm text-gray-500">{admin.role}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-right">
-                              <Badge variant={admin.status === 'active' ? 'default' : 'secondary'}>
-                                {admin.status}
-                              </Badge>
-                              <div className="text-xs text-gray-500 mt-1">{admin.lastLogin}</div>
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="outline">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

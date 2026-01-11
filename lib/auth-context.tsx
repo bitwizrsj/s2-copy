@@ -3,12 +3,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface User {
+export interface User {
   id: number;
   email: string;
   firstName: string | null;
   lastName: string | null;
-  role: string;
+  role: 'superadmin' | 'admin' | 'teacher' | 'parent' | 'student';
   institutionId: number | null;
   isPasswordChanged: boolean;
 }
@@ -16,10 +16,12 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string, role: string) => Promise<any>;
+  login: (email: string, password: string, role: string) => Promise<void>;
   logout: () => void;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<any>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updateProfile: (data: { firstName?: string; lastName?: string }) => Promise<void>;
   isAuthenticated: boolean;
+  refreshUser: () => void;
 }
 
 interface AuthProviderProps {
@@ -47,7 +49,7 @@ const getCookie = (name: string): string | null => {
 
 const setCookie = (name: string, value: string, days = 7) => {
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Strict${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`;
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Strict`;
 };
 
 const deleteCookie = (name: string) => {
@@ -59,7 +61,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Parse user from cookie
   const getUserFromCookie = (): User | null => {
     const userCookie = getCookie('user');
     if (!userCookie) return null;
@@ -71,99 +72,101 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    // Check if user is authenticated
+  const refreshUser = () => {
     const userData = getUserFromCookie();
-    if (userData) {
-      setUser(userData);
-    }
+    setUser(userData);
+  };
+
+  useEffect(() => {
+    refreshUser();
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string, role: string) => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, role }),
-      });
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, role }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      const { token, user: userData } = data.data;
-
-      // Set auth cookies
-      setCookie('token', token);
-      setCookie('user', encodeURIComponent(JSON.stringify(userData)));
-      
-      // Update state
-      setUser(userData);
-
-      // Check if password needs to be changed
-      if (data.data.requiresPasswordChange || !userData.isPasswordChanged) {
-        router.push('/change-password');
-        return;
-      }
-
-      // Redirect based on role
-      router.push(`/dashboard/${role}`);
-    } catch (error) {
-      throw error;
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Login failed');
     }
+
+    const { token, user: userData } = data.data;
+
+    setCookie('token', token);
+    setCookie('user', encodeURIComponent(JSON.stringify(userData)));
+    setUser(userData);
+
+    if (data.data.requiresPasswordChange || !userData.isPasswordChanged) {
+      router.push('/change-password');
+      return;
+    }
+
+    router.push(`/dashboard/${role}`);
   };
 
   const logout = () => {
-    // Clear cookies
     deleteCookie('token');
     deleteCookie('user');
-    
-    // Update state
     setUser(null);
-    
-    // Redirect to login (root page)
     router.push('/');
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
-    try {
-      const token = getCookie('token');
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+    const token = getCookie('token');
+    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to change password');
-      }
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Failed to change password');
+    }
 
-      // Update token if provided
-      if (data.data.token) {
-        setCookie('token', data.data.token);
-      }
+    if (data.data.token) {
+      setCookie('token', data.data.token);
+    }
 
-      // Update user's password changed status
-      if (user) {
-        const updatedUser = { ...user, isPasswordChanged: true };
-        setCookie('user', encodeURIComponent(JSON.stringify(updatedUser)));
-        setUser(updatedUser);
-      }
+    if (user) {
+      const updatedUser = { ...user, isPasswordChanged: true };
+      setCookie('user', encodeURIComponent(JSON.stringify(updatedUser)));
+      setUser(updatedUser);
+    }
+  };
 
-      return data;
-    } catch (error) {
-      throw error;
+  const updateProfile = async (data: { firstName?: string; lastName?: string }) => {
+    const token = getCookie('token');
+    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/users/me/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update profile');
+    }
+
+    if (user) {
+      const updatedUser = { ...user, ...data };
+      setCookie('user', encodeURIComponent(JSON.stringify(updatedUser)));
+      setUser(updatedUser);
     }
   };
 
@@ -173,7 +176,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     changePassword,
+    updateProfile,
     isAuthenticated: !!user,
+    refreshUser,
   };
 
   return (

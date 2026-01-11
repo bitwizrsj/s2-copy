@@ -3,10 +3,10 @@
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { ProfilePage } from '@/components/common/profile-page';
 
-export default function StudentProfile() {
+export default function SuperAdminProfile() {
   return (
-    <DashboardLayout role="student" title="Profile">
-      <ProfilePage role="student" />
+    <DashboardLayout role="superadmin" title="Profile">
+      <ProfilePage role="superadmin" />
     </DashboardLayout>
   );
 }

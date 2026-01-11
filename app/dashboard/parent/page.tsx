@@ -3,25 +3,25 @@
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth-context';
-import { BookOpen, Calendar, Award, FileText } from 'lucide-react';
+import { GraduationCap, Calendar, Award, MessageSquare } from 'lucide-react';
 
-export default function StudentDashboard() {
+export default function ParentDashboard() {
   const { user } = useAuth();
 
   const stats = [
-    { title: 'My Classes', value: '6', icon: BookOpen, color: 'bg-blue-100 text-blue-600' },
-    { title: 'Upcoming Tests', value: '2', icon: Calendar, color: 'bg-orange-100 text-orange-600' },
-    { title: 'Current GPA', value: '3.8', icon: Award, color: 'bg-green-100 text-green-600' },
-    { title: 'Assignments Due', value: '4', icon: FileText, color: 'bg-purple-100 text-purple-600' },
+    { title: 'Children', value: '2', icon: GraduationCap, color: 'bg-purple-100 text-purple-600' },
+    { title: 'Upcoming Events', value: '3', icon: Calendar, color: 'bg-blue-100 text-blue-600' },
+    { title: 'Avg Grade', value: 'A-', icon: Award, color: 'bg-green-100 text-green-600' },
+    { title: 'Messages', value: '5', icon: MessageSquare, color: 'bg-orange-100 text-orange-600' },
   ];
 
   return (
-    <DashboardLayout role="student" title="Student Dashboard">
+    <DashboardLayout role="parent" title="Parent Dashboard">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Welcome Message */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl p-6 text-white">
-          <h2 className="text-2xl font-bold">Welcome, Student!</h2>
-          <p className="text-blue-100 mt-1">Track your progress and stay on top of your studies.</p>
+        <div className="bg-gradient-to-r from-purple-500 to-violet-500 rounded-xl p-6 text-white">
+          <h2 className="text-2xl font-bold">Welcome, Parent!</h2>
+          <p className="text-purple-100 mt-1">Track your child&apos;s progress and stay connected.</p>
         </div>
 
         {/* Stats Grid */}
@@ -49,11 +49,11 @@ export default function StudentDashboard() {
         {/* Info Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Student Portal</CardTitle>
-            <CardDescription>Access your academic resources</CardDescription>
+            <CardTitle>Parent Portal</CardTitle>
+            <CardDescription>Monitor your child&apos;s education</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">Welcome to the EduSmart Student Portal. Use the sidebar to navigate to your profile and settings.</p>
+            <p className="text-gray-600">Welcome to the EduSmart Parent Portal. Use the sidebar to navigate to your profile and settings.</p>
           </CardContent>
         </Card>
       </div>

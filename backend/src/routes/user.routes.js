@@ -8,6 +8,15 @@ const { body, param, query } = require('express-validator');
 // Apply auth middleware to all routes
 router.use(authMiddleware.verifyToken);
 
+// Update own profile (any authenticated user)
+router.put('/me/profile',
+  [
+    body('firstName').optional().trim(),
+    body('lastName').optional().trim()
+  ],
+  UserController.updateOwnProfile
+);
+
 // Create user (admin/superadmin only)
 router.post('/',
   [
