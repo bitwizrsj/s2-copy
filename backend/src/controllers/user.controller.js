@@ -428,6 +428,47 @@ class UserController {
       });
     }
   }
+
+  // Update own profile (any authenticated user)
+  static async updateOwnProfile(req, res) {
+    try {
+      const userId = req.user.id;
+      const { firstName, lastName } = req.body;
+
+      const updateData = {};
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          institutionId: true,
+          status: true,
+          isPasswordChanged: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+      return res.json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: updatedUser
+      });
+    } catch (error) {
+      console.error('Update own profile error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
 }
 
 module.exports = UserController;
