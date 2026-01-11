@@ -10,7 +10,8 @@ class UserController {
         firstName,
         lastName,
         role,
-        institutionId
+        institutionId,
+        password
       } = req.body;
 
       const createdBy = req.user.id;
@@ -34,9 +35,18 @@ class UserController {
         finalInstitutionId = req.user.institutionId;
       }
 
-      // Hash default password
-      const defaultPassword = process.env.DEFAULT_PASSWORD;
-      const hashedPassword = await PasswordUtil.hashPassword(defaultPassword);
+      // Use provided password or default password
+      const userPassword = password || process.env.DEFAULT_PASSWORD;
+      
+      // Validate password
+      if (userPassword && userPassword.length < 8) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 8 characters long'
+        });
+      }
+      
+      const hashedPassword = await PasswordUtil.hashPassword(userPassword);
 
       // Create user
       const user = await prisma.user.create({
@@ -68,7 +78,7 @@ class UserController {
         success: true,
         message: 'User created successfully',
         data: user,
-        note: `Default password: ${defaultPassword}. User must change it on first login.`
+        note: 'User must change their password on first login.'
       });
     } catch (error) {
       console.error('Create user error:', error);
